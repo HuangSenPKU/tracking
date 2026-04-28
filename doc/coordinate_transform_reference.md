@@ -60,25 +60,32 @@ p_S = R_S<-L * p_L + t_S<-L
 p_L = R_L<-S * p_S + t_L<-S
 ```
 
-## 4. 姿态旋转（SPAN local = NED）
+## 4. 姿态旋转（SPAN CPT7）
 
 函数：`rotation_matrix_from_ie(roll_deg, pitch_deg, heading_deg)`
 
-当前实现逻辑：
-
-1. 用 `roll/pitch/heading` 构建 `R_NED<-body`
-2. 用固定矩阵 `R_ENU<-NED` 转到 ENU
+CPT7 的 RPY 输出定义了从 ENU 到 **CPT7 内部 RFU (Right/Forward/Up)** 的基变换：
 
 ```text
-R_NED<-body = Rz(heading) * Ry(pitch) * Rx(roll)
-
-R_ENU<-NED =
-[[0, 1, 0],
- [1, 0, 0],
- [0, 0,-1]]
-
-R_ENU<-body = R_ENU<-NED * R_NED<-body
+C_{ENU -> RFU} = R_y(R) * R_x(P) * R_z(-A)
 ```
+
+其中 `R_*(θ)` 均为 passive 旋转（基变换）。
+
+本项目车体（base_link）为 FLU，下游 `lidar_to_ie_body` 输出的是 SPAN 原点处的
+车体 FLU 坐标，因此先取 `R_{ENU <- RFU} = C_{ENU->RFU}^T`，再乘上 CPT7 RFU 到
+车体 FLU 的静态 90° 旋转：
+
+```text
+R_{RFU <- FLU} =
+[[ 0, -1, 0],
+ [ 1,  0, 0],
+ [ 0,  0, 1]]
+
+R_{ENU <- FLU} = R_{ENU <- RFU} * R_{RFU <- FLU}
+```
+
+注：`R_{RFU <- FLU}` 为绕 z 的 90° 旋转（det = +1），而不是 FRD↔RFU 的轴交换。
 
 ## 5. 地理坐标转换
 
@@ -168,8 +175,9 @@ p_C = (R_target<-camera)^T * (p_L - t_target<-camera)
 
 ## 10. 当前最易出错的转换环节
 
-1. `base_to_span` 方向语义（必须是 `T_B<-S`）
-2. SPAN body 轴系定义（FLU/FRD/NED body约定）
-3. heading 定义与 `R_NED<-body` 构造约定是否一致
-4. camera-lidar 外参与 `aruco_context` 旋转方向
+1. `base_to_span` 方向语义（`T_B<-S`，span_link 定义为 FRD，而 base_link 为 FLU）
+2. CPT7 输出的 RPY 是 `C_{ENU->RFU}`（CPT7 内部 RFU），不是 `C_{ENU->FLU}` 也不是 `C_{NED<-FRD}`
+3. CPT7 RFU 与车体 FLU 之间差一个 90° 绕 z 的旋转（不是 FRD↔RFU 轴交换）
+4. `rotation_matrix_from_ie` 必须返回 `R_{ENU<-FLU}`，与 `lidar_to_ie_body` 的 FLU 输出匹配
+5. camera-lidar 外参与 `aruco_context` 旋转方向
 

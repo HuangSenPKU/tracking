@@ -1,10 +1,13 @@
 input:
   rosbag:
-    bag_path: data/2026-04-14_mongkok-opensky-walk-006/rosbag/segment_2026-04-14-17-31-17_2.bag
+    bag_path: data/2026-04-20_whampoa-suburban-walk-001/rosbag/segment_2026-04-20-16-59-35_3.bag
     topic: /lidar
     start_time_s: null
     end_time_s: null
     loop: false
+
+ie_pose:
+  path: /root/data/0421-AM-2026/CollectionSystem/IE/0421-AM-2026.txt
 
 roi:
   shape: circle
@@ -28,7 +31,7 @@ roi:
     min_points_after_crop: 180
 
 ego_vehicle_filter:
-  enabled: true
+  enabled: false
   x: [-2.5, 1.5]
   y: [-1.2, 1.2]
   z: [-2.0, 2.0]
@@ -57,14 +60,6 @@ clustering:
   merge_z_gap_m: 0.9
   merge_max_points: 8000
 
-temporal_fusion:
-  enabled: true
-  half_window_frames: 1
-  max_time_span_s: 0.25
-  motion_compensation_with_ie: true
-  voxel_size_m: 0.06
-  max_points_after_fusion: 20000
-
 ie_lidar_extrinsics:
   base_from_lidar:
     # T_base<-lidar (FLU), from GeoScanS2 TF drawing
@@ -74,31 +69,12 @@ ie_lidar_extrinsics:
       - [-0.4226, 0.0, 0.9063]
     translation_m: [0.0315, 0.0, 0.1314]
   base_to_span:
-    # T_base<-span (FLU), from Extrinsics.pdf base_link_to_span_link
+    # T_span<-base (FLU->RFU), from Extrinsics.pdf base_link_to_span_link
     rotation_3x3:
-      - [1.0, 0.0, 0.0]
       - [0.0, -1.0, 0.0]
-      - [0.0, 0.0, -1.0]
-    translation_m: [-0.2684, -0.082, -0.1527]
-
-detector:
-  enabled: true
-  # cluster | centerpoint | hybrid | aruco_mask_v2
-  source: aruco_mask_v2
-  dedup_distance_m: 0.4
-  centerpoint:
-    # none | mmdet3d | python_module
-    provider: mmdet3d
-    score_threshold: 0.2
-    # Label ids considered person class by the detector.
-    person_label_ids: [0]
-    # mmdet3d backend
-    config_path: "checkpoints/centerpoint/centerpoint_nus.py"
-    checkpoint_path: "checkpoints/centerpoint/centerpoint_nus.pth"
-    device: cuda:0
-    # python_module backend: function(points_xyz: np.ndarray, timestamp: float) -> list[dict]
-    module_path: ""
-    function_name: infer
+      - [1.0, 0.0, 0.0]
+      - [0.0, 0.0, 1.0]
+    translation_m: [0.0, 0.1854, 0.242]
 
 person_cluster:
   min_points: 4
@@ -154,25 +130,15 @@ tracker:
 logging:
   output_json: outputs/lidar_tracking_log.json
   print_summary_every_frame: true
-  flush_every_frame: true
+  flush_every_frame: false
+  write_fusion_json: true
+  write_target_world_json: true
 
 sync:
   camera_sync_max_dt_s: 0.08
 
-segmentation:
-  enabled: true
-  predictor_kind: detectron
-  task: instance
-  config_path: imseg/mask2former/config/swin/maskformer2_swin_large_IN21k_384_coco_instance_100ep.yaml
-  model_path: imseg/mask2former/model/mask2former_swin_large_coco_instance_100ep.pkl
-  person_class_id: 0
-  min_person_mask_area_px: 5000
-  max_instances_considered: 5
-  candidate_dedup_distance_m: 0.2
-  camera_config: configs/aruco_config.yaml
-
 debug:
-  save_images: true
+  save_images: false
   output_dir: outputs/lidar_debug
   every_n_frames: 5
   image_width: 1200
